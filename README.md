@@ -553,3 +553,46 @@ n8n (内部) → HTTP Request → OpenClaw /hooks/agent (exe.dev)
 - [Cloudflare Origin Certificate](https://developers.cloudflare.com/ssl/origin-configuration/origin-ca/)
 - [Cloudflare Authenticated Origin Pulls](https://developers.cloudflare.com/ssl/origin-configuration/authenticated-origin-pull/)
 - [さくらの VPS](https://vps.sakura.ad.jp/)
+
+## 現状把握（1→2 実施ログ）
+
+### 1) 現状把握サマリ
+
+- 本リポジトリは現時点で **設計ドキュメント中心** で、アプリ実装コード（Event API / n8n workflow 定義 / Prisma schema / compose ファイル）は未追加。
+- アーキテクチャと運用方針（入口を Event API のみに限定、n8n 非公開、`processed_at` 管理、`event_id` による冪等性）は明確に定義されている。
+- マイルストーンが具体的で、Phase 0〜3 の段階的導入計画があるため、実装着手前の合意ドキュメントとしての完成度は高い。
+
+### 2) QAレビュー（不具合予防・実装前チェック）
+
+実装前に詰めると事故を減らせるポイントを優先度順で整理。
+
+#### High
+
+1. **イベント時刻 `ts` の正規化仕様が未固定**
+   - 「Tasker 側で `ts` を送らず API で補完推奨」とある一方、共通エンベロープでは `ts` 必須に見える。
+   - 実装時は「`ts` 省略時に `received_at` で補完し、元値は `client_ts` として別保存」などを先に決めると解析時系列の混乱を防げる。
+
+2. **再送戦略の上限と Dead Letter の扱いが未定義**
+   - `sent_at IS NULL` で再送方針はあるが、恒久失敗時の停止条件（最大試行回数・退避先）が未記載。
+   - `retry_count` / `last_error` / `next_retry_at` を `digests` に持たせると運用時の可観測性が向上。
+
+#### Medium
+
+3. **OpenClaw 送信の冪等キー運用を明文化すると安全**
+   - `digest_id` を message に含める方針はあるため、OpenClaw 側での重複判定キー（`digest_id`）を仕様として固定すると二重通知を抑止しやすい。
+
+4. **Cloudflare IP 制限の運用負荷が高い**
+   - Cloudflare IP レンジ更新追随が必要。自動更新スクリプト（iptables/nftables 反映）の運用方針を先に決めると保守負荷を下げられる。
+
+#### Low
+
+5. **MVP の受け入れ条件（SLO/SLA）を最小定義すると検証しやすい**
+   - 例: 「イベント受信から digest POST 成功まで p95 5分以内」「重複イベント挿入 0 件（UNIQUE により吸収）」。
+
+### 次アクション（推奨）
+
+- Phase 1 着手前に `docs/specs/event-contract.md` を新規作成し、以下だけ先に固定する。
+  - `ts` / `client_ts` / `received_at` の優先順位
+  - `digests` 再送上限・バックオフ・DLQ 条件
+  - OpenClaw 側の冪等判定キー
+- その後、Prisma schema → Event API 最小実装（`POST /events` + `ON CONFLICT DO NOTHING`）の順で着手。
