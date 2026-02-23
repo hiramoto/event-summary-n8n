@@ -596,3 +596,45 @@ n8n (内部) → HTTP Request → OpenClaw /hooks/agent (exe.dev)
   - `digests` 再送上限・バックオフ・DLQ 条件
   - OpenClaw 側の冪等判定キー
 - その後、Prisma schema → Event API 最小実装（`POST /events` + `ON CONFLICT DO NOTHING`）の順で着手。
+
+---
+
+## 実装済み（MVP Event API）
+
+README の Phase 1 にある最小要件に合わせて、以下を実装しました。
+
+- `POST /events`（Bearer Token 認証あり）
+- `GET /events`（Bearer Token 認証あり、未処理絞り込み可能）
+- `event_id` の UNIQUE 制約 + upsert による冪等受信
+- Prisma schema / migration の追加（`events` テーブル）
+
+### ローカル実行
+
+```bash
+cp .env.example .env
+npm install
+npx prisma generate
+npx prisma migrate deploy
+npm run dev
+```
+
+### API 例
+
+```bash
+curl -X POST http://localhost:3000/events \
+  -H "Authorization: Bearer $EVENT_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "event_id":"550e8400-e29b-41d4-a716-446655440000",
+    "type":"location",
+    "ts":"2025-02-23T10:30:00+09:00",
+    "device_id":"android-main",
+    "payload":{"state":"enter","place":"home"},
+    "meta":{"source":"tasker"}
+  }'
+```
+
+```bash
+curl "http://localhost:3000/events?unprocessed_only=true&limit=50" \
+  -H "Authorization: Bearer $EVENT_API_TOKEN"
+```
