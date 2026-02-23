@@ -446,7 +446,6 @@ Task: SendEvent
         Body: {
           "event_id": "%uuid",
           "type": "location",
-          "ts": "%TIMES",
           "payload": {
             "event": "%event",
             "place_id": "%algeofence",
@@ -459,6 +458,9 @@ Task: SendEvent
         Timeout: 30
       ]
 ```
+
+- `ts` は ISO 8601 文字列（例: `2025-02-23T10:30:00+09:00`）が前提
+- Tasker の `%TIMES` は Unix 秒で仕様不一致になるため、**`ts` は送らず Event API 側で補完**する運用を推奨
 
 ### バッテリー最適化
 
