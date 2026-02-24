@@ -15,7 +15,7 @@
 3. **Phase 3（イベントタイプ拡張）**: 未実装
    - `email` / `todo` / `vital` の受信・集約仕様を追加
 
-### ローカル実行
+### ローカル実行（TypeScript）
 
 ```bash
 cp .env.example .env
@@ -23,6 +23,16 @@ npm install
 npm run prisma:generate
 npm run prisma:migrate
 npm run dev
+```
+
+### スクリプト導線
+
+```bash
+npm run test      # node:test + tsx で API テスト実行
+npm run typecheck # TypeScript 型チェック
+npm run check     # test + typecheck
+npm run build     # check 通過後に dist へビルド
+npm run start     # dist/server.js を起動
 ```
 
 ## 全体構成
