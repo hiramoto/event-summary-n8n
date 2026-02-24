@@ -2,6 +2,37 @@
 
 スマホ（Android / Tasker）から送信した個人イベントデータ（位置情報など）を収集・集約し、exe.dev 上の OpenClaw に圧縮して渡すことで、タイミングに応じたパーソナルなメッセージを受け取るためのシステム。
 
+## 実装優先順位（MVP）
+
+現時点では以下の順で実装する。
+
+1. **Event API の最小実装（完了）**
+   - `POST /events` (Bearer Token 認証, envelope バリデーション)
+   - インメモリ保存による `event_id` 冪等化（重複時 `duplicate: true`）
+   - `GET /healthz`
+2. **eventdb スキーマ作成（完了・接続は次工程）**
+   - `events` テーブルと未処理イベント取得用 index の SQL を作成
+3. **PostgreSQL Repository 実装（次優先）**
+   - `ON CONFLICT DO NOTHING` を使った永続化
+4. **n8n バッチ（次優先）**
+   - 未処理イベントの集約と digest 作成
+4. **OpenClaw 送信 + 再送制御（次優先）**
+   - `digests.sent_at` ベースの再送
+
+### ローカル実行（Event API MVP）
+
+```bash
+npm install
+export EVENT_API_TOKEN=replace-me
+node src/server.js
+```
+
+### テーブル作成
+
+```bash
+psql "$DATABASE_URL" -f db/001_init.sql
+```
+
 ## 全体構成
 
 ```
