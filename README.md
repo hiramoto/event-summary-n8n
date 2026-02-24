@@ -4,34 +4,25 @@
 
 ## 実装優先順位（MVP）
 
-現時点では以下の順で実装する。
+現状は **Fastify + Prisma の Event/Digest API まで実装済み**。残りを以下の順で進める。
 
-1. **Event API の最小実装（完了）**
-   - `POST /events` (Bearer Token 認証, envelope バリデーション)
-   - インメモリ保存による `event_id` 冪等化（重複時 `duplicate: true`）
-   - `GET /healthz`
-2. **eventdb スキーマ作成（完了・接続は次工程）**
-   - `events` テーブルと未処理イベント取得用 index の SQL を作成
-3. **PostgreSQL Repository 実装（進行中）**
-   - `ON CONFLICT DO NOTHING` を使った永続化
-   - `digests` テーブルと `sent_at` を使った再送管理 API を追加
-4. **n8n バッチ（次優先）**
-   - 未処理イベントの集約と digest 作成
-4. **OpenClaw 送信 + 再送制御（次優先）**
-   - `digests.sent_at` ベースの再送
+1. **Phase 1（API/DB 基盤）**: 実装済み
+   - `POST /events`, `GET /events`
+   - `POST /digests`, `GET /digests`, `POST /digests/:digestId/sent`
+   - Prisma 経由での永続化（`events` / `digests`）
+2. **Phase 2（OpenClaw 連携の運用強化）**: 未実装
+   - n8n から OpenClaw 送信、再送ポリシーの明文化
+3. **Phase 3（イベントタイプ拡張）**: 未実装
+   - `email` / `todo` / `vital` の受信・集約仕様を追加
 
-### ローカル実行（Event API MVP）
+### ローカル実行
 
 ```bash
+cp .env.example .env
 npm install
-export EVENT_API_TOKEN=replace-me
-node src/server.js
-```
-
-### テーブル作成
-
-```bash
-psql "$DATABASE_URL" -f db/001_init.sql
+npm run prisma:generate
+npm run prisma:migrate
+npm run dev
 ```
 
 ## 全体構成
@@ -530,37 +521,49 @@ n8n (内部) → HTTP Request → OpenClaw /hooks/agent (exe.dev)
 - [ ] `caddy/certs/` に Origin Cert + Key + Origin Pull CA を配置
 - [ ] `docker compose up` で Caddy + PostgreSQL 起動、HTTPS 確認
 - [ ] SSH トンネルで n8n 管理画面にアクセスできることを確認
+- 次アクション: VPS 上の初期セットアップ手順を `docs/runbook` に手順化する。
 
 ### Phase 1: Location イベント（MVP）
 
-- [ ] Event API 実装（POST /events, GET /events, Bearer Token 認証, 冪等性）
-- [ ] Prisma schema 定義 → `prisma migrate deploy` でテーブル作成
-- [ ] places テーブルに自宅・職場などの初期データ投入
-- [ ] Tasker + AutoLocation でジオフェンス設定、テスト送信
-- [ ] Cloudflare WAF: Rate Limiting + POST only ルール設定
-- [ ] n8n ワークフロー: cron(5分) → 未処理 events 取得 → 滞在セグメント化 → digests 保存 → processed_at 更新
-- [ ] n8n → OpenClaw `/hooks/agent` への digest 送信
-- [ ] 送信失敗時の再送動作を確認
+- [x] Event API 実装（Fastify + Prisma、Bearer Token 認証、冪等性）
+- [x] Prisma schema / migration 適用（`events`, `digests`）
+- [x] digest 保存 API と `sent_at` 更新 API を実装
+- [ ] places テーブルに自宅・職場などの初期データ投入（未実装）
+- [ ] Tasker + AutoLocation でジオフェンス設定、テスト送信（未実装）
+- [ ] Cloudflare WAF: Rate Limiting + POST only ルール設定（未実装）
+- [ ] n8n ワークフロー: cron(5分) → 未処理 events 取得 → 滞在セグメント化 → digests 保存 → processed_at 更新（未実装）
+- 次アクション: n8n 側で digest 生成〜`processed_at` 更新までを先に自動化する。
 
 ### Phase 2: OpenClaw 統合の最適化
 
-- [ ] OpenClaw workspace に skill 作成（digest 解釈ルール）
-- [ ] タイミング制御（通勤中・帰宅後などに応じたメッセージング）
-- [ ] digest フォーマット最適化（OpenClaw の応答品質を見ながら調整）
-- [ ] pg_dump 日次バックアップの自動化
+- [ ] OpenClaw workspace に skill 作成（未実装）
+- [ ] タイミング制御（通勤中・帰宅後などに応じたメッセージング）（未実装）
+- [ ] digest フォーマット最適化（未実装）
+- [ ] pg_dump 日次バックアップの自動化（未実装）
+- 次アクション: OpenClaw 送信のリトライ方針（上限・間隔）を仕様化する。
 
 ### Phase 3: イベントタイプ追加
 
-- [ ] email イベント（ヘッダのみ）
-- [ ] todo ステータス変更イベント
-- [ ] vital イベント（起床・運動など）
+- [ ] email イベント（ヘッダのみ）（未実装）
+- [ ] todo ステータス変更イベント（未実装）
+- [ ] vital イベント（起床・運動など）（未実装）
+- 次アクション: `type` ごとの payload スキーマを先に固定する。
+
+## 現在有効な API 一覧
+
+> パスの正本は `/events`, `/digests`, `/digests/:digestId/sent`。
+
+- `POST /events` : イベントの冪等保存（`event_id` 重複時は `duplicate: true`）
+- `GET /events` : イベント一覧取得（`unprocessed_only`, `limit`）
+- `POST /digests` : digest の冪等保存（`digest_id` 重複時は `duplicate: true`）
+- `GET /digests` : digest 一覧取得（`unsent_only`, `limit`）
+- `POST /digests/:digestId/sent` : `sent_at` を更新（未指定時は現在時刻）
 
 ## 未決事項
 
 | 項目 | 選択肢 / メモ |
 |------|--------------|
 | VPS プラン | 2GB / 4GB — n8n + Postgres の常駐を考慮して決定 |
-| Event API の FW | Hono / Fastify（TypeScript） |
 | 監視 / アラート | Uptime Kuma / Healthchecks.io 等 |
 | バックアップ先 | pg_dump → さくらオブジェクトストレージ or S3 互換 |
 | OpenClaw skill の詳細設計 | digest の解釈ルール、応答テンプレート |
@@ -585,98 +588,3 @@ n8n (内部) → HTTP Request → OpenClaw /hooks/agent (exe.dev)
 - [Cloudflare Origin Certificate](https://developers.cloudflare.com/ssl/origin-configuration/origin-ca/)
 - [Cloudflare Authenticated Origin Pulls](https://developers.cloudflare.com/ssl/origin-configuration/authenticated-origin-pull/)
 - [さくらの VPS](https://vps.sakura.ad.jp/)
-
-## 現状把握（1→2 実施ログ）
-
-### 1) 現状把握サマリ
-
-- 本リポジトリは現時点で **設計ドキュメント中心** で、アプリ実装コード（Event API / n8n workflow 定義 / Prisma schema / compose ファイル）は未追加。
-- アーキテクチャと運用方針（入口を Event API のみに限定、n8n 非公開、`processed_at` 管理、`event_id` による冪等性）は明確に定義されている。
-- マイルストーンが具体的で、Phase 0〜3 の段階的導入計画があるため、実装着手前の合意ドキュメントとしての完成度は高い。
-
-### 2) QAレビュー（不具合予防・実装前チェック）
-
-実装前に詰めると事故を減らせるポイントを優先度順で整理。
-
-#### High
-
-1. **イベント時刻 `ts` の正規化仕様が未固定**
-   - 「Tasker 側で `ts` を送らず API で補完推奨」とある一方、共通エンベロープでは `ts` 必須に見える。
-   - 実装時は「`ts` 省略時に `received_at` で補完し、元値は `client_ts` として別保存」などを先に決めると解析時系列の混乱を防げる。
-
-2. **再送戦略の上限と Dead Letter の扱いが未定義**
-   - `sent_at IS NULL` で再送方針はあるが、恒久失敗時の停止条件（最大試行回数・退避先）が未記載。
-   - `retry_count` / `last_error` / `next_retry_at` を `digests` に持たせると運用時の可観測性が向上。
-
-#### Medium
-
-3. **OpenClaw 送信の冪等キー運用を明文化すると安全**
-   - `digest_id` を message に含める方針はあるため、OpenClaw 側での重複判定キー（`digest_id`）を仕様として固定すると二重通知を抑止しやすい。
-
-4. **Cloudflare IP 制限の運用負荷が高い**
-   - Cloudflare IP レンジ更新追随が必要。自動更新スクリプト（iptables/nftables 反映）の運用方針を先に決めると保守負荷を下げられる。
-
-#### Low
-
-5. **MVP の受け入れ条件（SLO/SLA）を最小定義すると検証しやすい**
-   - 例: 「イベント受信から digest POST 成功まで p95 5分以内」「重複イベント挿入 0 件（UNIQUE により吸収）」。
-
-### 次アクション（推奨）
-
-- Phase 1 着手前に `docs/specs/event-contract.md` を新規作成し、以下だけ先に固定する。
-  - `ts` / `client_ts` / `received_at` の優先順位
-  - `digests` 再送上限・バックオフ・DLQ 条件
-  - OpenClaw 側の冪等判定キー
-- その後、Prisma schema → Event API 最小実装（`POST /events` + `ON CONFLICT DO NOTHING`）の順で着手。
-
----
-
-## 実装済み（MVP Event API）
-
-README の Phase 1 にある最小要件に合わせて、以下を実装しました。
-
-- `POST /events`（Bearer Token 認証あり）
-- `GET /events`（Bearer Token 認証あり、未処理絞り込み可能）
-- `event_id` の UNIQUE 制約 + upsert による冪等受信
-- Prisma schema / migration の追加（`events` テーブル）
-
-### ローカル実行
-
-```bash
-cp .env.example .env
-npm install
-npx prisma generate
-npx prisma migrate deploy
-npm run dev
-```
-
-### API 例
-
-```bash
-curl -X POST http://localhost:3000/events \
-  -H "Authorization: Bearer $EVENT_API_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "event_id":"550e8400-e29b-41d4-a716-446655440000",
-    "type":"location",
-    "ts":"2025-02-23T10:30:00+09:00",
-    "device_id":"android-main",
-    "payload":{"state":"enter","place":"home"},
-    "meta":{"source":"tasker"}
-  }'
-```
-
-```bash
-curl "http://localhost:3000/events?unprocessed_only=true&limit=50" \
-  -H "Authorization: Bearer $EVENT_API_TOKEN"
-```
-
-
-## 現在のAPI（実装済み）
-
-- `POST /events` : イベントの冪等保存（`event_id` 重複時は `duplicate: true`）
-- `GET /events` : イベント一覧取得（`unprocessed_only`, `limit`）
-- `POST /digests` : digest の冪等保存（`digest_id` 重複時は `duplicate: true`）
-- `GET /digests` : digest 一覧取得（`unsent_only`, `limit`）
-- `POST /digests/:digestId/sent` : `sent_at` を更新
-
