@@ -1,4 +1,5 @@
 import type { FastifyPluginAsync } from "fastify";
+import type { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "../db.js";
 
@@ -36,9 +37,9 @@ export const eventsRoute: FastifyPluginAsync = async (app) => {
         eventId: event.event_id,
         type: event.type,
         ts: new Date(event.ts),
-        payload: event.payload,
+        payload: event.payload as Prisma.InputJsonValue,
         deviceId: event.device_id,
-        meta: event.meta
+        meta: event.meta as Prisma.InputJsonValue
       }
     });
 
