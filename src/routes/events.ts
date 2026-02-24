@@ -30,20 +30,23 @@ export const eventsRoute: FastifyPluginAsync = async (app) => {
 
     const event = parsed.data;
 
-    await prisma.event.upsert({
-      where: { eventId: event.event_id },
-      update: {},
-      create: {
+    const result = await prisma.event.createMany({
+      data: {
         eventId: event.event_id,
         type: event.type,
         ts: new Date(event.ts),
         payload: event.payload as Prisma.InputJsonValue,
         deviceId: event.device_id,
         meta: event.meta as Prisma.InputJsonValue
-      }
+      },
+      skipDuplicates: true
     });
 
-    return reply.code(200).send({ ok: true, event_id: event.event_id });
+    return reply.code(200).send({
+      ok: true,
+      event_id: event.event_id,
+      duplicate: result.count === 0
+    });
   });
 
   app.get("/events", async (request, reply) => {
