@@ -4,16 +4,14 @@
 
 ## 実装優先順位（MVP）
 
-現状は **Fastify + Prisma の Event/Digest API まで実装済み**。残りを以下の順で進める。
+現状は **Phase 1〜3 の主要機能（Event/Digest API、places、digest worker）まで実装済み**。
 
 1. **Phase 1（API/DB 基盤）**: 実装済み
    - `POST /events`, `GET /events`
    - `POST /digests`, `GET /digests`, `POST /digests/:digestId/sent`
    - Prisma 経由での永続化（`events` / `digests`）
-2. **Phase 2（OpenClaw 連携の運用強化）**: 未実装
-   - n8n から OpenClaw 送信、再送ポリシーの明文化
-3. **Phase 3（イベントタイプ拡張）**: 未実装
-   - `email` / `todo` / `vital` の受信・集約仕様を追加
+2. **Phase 2（OpenClaw 連携の運用強化）**: 実装済み（digest worker の送信処理を含む）
+3. **Phase 3（イベントタイプ拡張）**: 実装済み（`email` / `todo` / `vital` を受信・集約）
 
 ### ローカル実行（TypeScript）
 
@@ -34,6 +32,13 @@ npm run check     # test + typecheck
 npm run build     # check 通過後に dist へビルド
 npm run start     # dist/server.js を起動
 ```
+
+## このブランチの実装確認
+
+- `npm run check`（`test` + `typecheck`）が通過
+- API テスト 24 件がすべて成功
+- `POST /events` で `location` / `email` / `todo` / `vital` をバリデーション付きで受信可能
+- digest worker が location 集約 + 非 location 件数要約 + OpenClaw 送信 payload 生成を実装
 
 ## 全体構成
 
