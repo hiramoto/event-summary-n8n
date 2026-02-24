@@ -1,6 +1,7 @@
 import Fastify from "fastify";
 import { env } from "./env.js";
 import { eventsRoute } from "./routes/events.js";
+import { placesRoute } from "./routes/places.js";
 
 export function buildApp() {
   const app = Fastify({ logger: true });
@@ -25,6 +26,7 @@ export function buildApp() {
 
   app.get("/healthz", async () => ({ ok: true }));
   app.register(eventsRoute);
+  app.register(placesRoute);
 
   return app;
 }

@@ -11,7 +11,9 @@
     "build": "npm run check && tsc -p tsconfig.json",
     "start": "node dist/server.js",
     "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate deploy"
+    "prisma:migrate": "prisma migrate deploy",
+    "prisma:seed": "tsx prisma/seed.ts",
+    "digest": "tsx scripts/digest-worker.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.5.0",

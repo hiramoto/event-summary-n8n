@@ -7,29 +7,40 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Place {
+  placeId   String   @id @map("place_id")
+  label     String
+  lat       Float?
+  lng       Float?
+  radiusM   Int      @default(100) @map("radius_m")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("places")
+}
+
 model Event {
-  id           BigInt    @id @default(autoincrement())
-  eventId      String    @unique @map("event_id")
-  type         String
-  ts           DateTime
-  deviceId     String?   @map("device_id")
-  payload      Json
-  meta         Json?
-  receivedAt   DateTime  @default(now()) @map("received_at")
-  processedAt  DateTime? @map("processed_at")
+  id          BigInt    @id @default(autoincrement())
+  eventId     String    @unique @map("event_id")
+  type        String
+  ts          DateTime
+  deviceId    String?   @map("device_id")
+  payload     Json
+  meta        Json?
+  receivedAt  DateTime  @default(now()) @map("received_at")
+  processedAt DateTime? @map("processed_at")
 
   @@index([processedAt], map: "events_processed_at_idx")
-  @@index([ts], map: "events_ts_idx")
+  @@index([type, ts], map: "events_type_ts_idx")
   @@map("events")
 }
 
 model Digest {
-  id         BigInt    @id @default(autoincrement())
-  digestId   String    @unique @map("digest_id")
-  payload    Json
-  message    String?
-  createdAt  DateTime  @default(now()) @map("created_at")
-  sentAt     DateTime? @map("sent_at")
+  id        BigInt    @id @default(autoincrement())
+  digestId  String    @unique @map("digest_id")
+  payload   Json
+  message   String?
+  createdAt DateTime  @default(now()) @map("created_at")
+  sentAt    DateTime? @map("sent_at")
 
   @@index([sentAt], map: "digests_sent_at_idx")
   @@index([createdAt], map: "digests_created_at_idx")
