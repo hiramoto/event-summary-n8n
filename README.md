@@ -12,8 +12,9 @@
    - `GET /healthz`
 2. **eventdb スキーマ作成（完了・接続は次工程）**
    - `events` テーブルと未処理イベント取得用 index の SQL を作成
-3. **PostgreSQL Repository 実装（次優先）**
+3. **PostgreSQL Repository 実装（進行中）**
    - `ON CONFLICT DO NOTHING` を使った永続化
+   - `digests` テーブルと `sent_at` を使った再送管理 API を追加
 4. **n8n バッチ（次優先）**
    - 未処理イベントの集約と digest 作成
 4. **OpenClaw 送信 + 再送制御（次優先）**
@@ -669,3 +670,13 @@ curl -X POST http://localhost:3000/events \
 curl "http://localhost:3000/events?unprocessed_only=true&limit=50" \
   -H "Authorization: Bearer $EVENT_API_TOKEN"
 ```
+
+
+## 現在のAPI（実装済み）
+
+- `POST /events` : イベントの冪等保存（`event_id` 重複時は `duplicate: true`）
+- `GET /events` : イベント一覧取得（`unprocessed_only`, `limit`）
+- `POST /digests` : digest の冪等保存（`digest_id` 重複時は `duplicate: true`）
+- `GET /digests` : digest 一覧取得（`unsent_only`, `limit`）
+- `POST /digests/:digestId/sent` : `sent_at` を更新
+
