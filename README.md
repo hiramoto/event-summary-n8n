@@ -35,6 +35,22 @@ npm run build     # check 通過後に dist へビルド
 npm run start     # dist/server.js を起動
 ```
 
+### さくらの Docker コンテナサービス向け最小デプロイ
+
+このリポジトリには `Dockerfile` と `.env.example` を同梱しているため、
+コンテナサービスにそのまま登録できます。
+
+1. `main` ブランチ（またはデプロイ対象ブランチ）を push
+2. サービス側で以下の環境変数を設定
+   - `PORT`（例: `3000`）
+   - `EVENT_API_TOKEN`
+   - `DATABASE_URL`（PostgreSQL の接続文字列）
+3. 公開ポートを `3000` に設定
+4. デプロイ実行
+
+> コンテナ起動時に `prisma migrate deploy` を自動実行してから API を起動します。
+> そのため、`DATABASE_URL` は起動時点で接続可能な DB を指定してください。
+
 ## 全体構成
 
 ```
