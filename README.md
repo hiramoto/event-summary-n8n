@@ -35,6 +35,45 @@ npm run build     # check 通過後に dist へビルド
 npm run start     # dist/server.js を起動
 ```
 
+### 受信確認（最短チェック）
+
+公開前に「イベントが投稿できているか」だけ先に確認したい場合は、以下の3ステップで確認できます。
+
+1. API 生存確認
+
+```bash
+curl -i https://<your-domain>/healthz
+```
+
+期待値: `200` と `{"ok":true}`
+
+2. テストイベントを 1 件 POST
+
+```bash
+curl -i -X POST https://<your-domain>/events \
+  -H "Authorization: Bearer <EVENT_API_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "event_id":"550e8400-e29b-41d4-a716-446655440111",
+    "type":"location",
+    "ts":"2026-03-03T09:00:00+09:00",
+    "payload":{"event":"enter","place_id":"office"},
+    "device_id":"android-main",
+    "meta":{"source":"manual-check"}
+  }'
+```
+
+期待値: `200` と `{"ok":true, "duplicate":false}`
+
+3. 受信済みイベントを GET
+
+```bash
+curl -i "https://<your-domain>/events?limit=5" \
+  -H "Authorization: Bearer <EVENT_API_TOKEN>"
+```
+
+期待値: 直前に送った `event_id` がレスポンスに含まれる
+
 ### さくらの Docker コンテナサービス向け最小デプロイ
 
 このリポジトリには `Dockerfile` と `.env.example` を同梱しているため、
