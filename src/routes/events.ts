@@ -109,7 +109,7 @@ export const eventsRoute: FastifyPluginAsync = async (app) => {
 
     const digest = parsed.data;
 
-    const result = await (prisma as any).digest.createMany({
+    const result = await prisma.digest.createMany({
       data: {
         digestId: digest.digest_id,
         payload: digest.payload as Prisma.InputJsonValue,
@@ -137,7 +137,7 @@ export const eventsRoute: FastifyPluginAsync = async (app) => {
 
     const query = parsed.data;
 
-    const digests = await (prisma as any).digest.findMany({
+    const digests = await prisma.digest.findMany({
       where: query.unsent_only ? { sentAt: null } : undefined,
       orderBy: { createdAt: "desc" },
       take: query.limit
@@ -170,7 +170,7 @@ export const eventsRoute: FastifyPluginAsync = async (app) => {
       });
     }
 
-    const digest = await (prisma as any).digest.findUnique({ where: { digestId: digestId.data } });
+    const digest = await prisma.digest.findUnique({ where: { digestId: digestId.data } });
 
     if (!digest) {
       return reply.code(404).send({ message: "Digest not found" });
@@ -178,7 +178,7 @@ export const eventsRoute: FastifyPluginAsync = async (app) => {
 
     const sentAt = body.data.sent_at ? new Date(body.data.sent_at) : new Date();
 
-    const updated = await (prisma as any).digest.update({
+    const updated = await prisma.digest.update({
       where: { digestId: digestId.data },
       data: { sentAt }
     });
