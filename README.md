@@ -25,6 +25,29 @@ npm run prisma:migrate
 npm run dev
 ```
 
+### Docker Compose での起動
+
+`docker-compose.yml` を同梱しているため、ローカルでも API + PostgreSQL をそのまま起動できます。
+
+```bash
+cp .env.example .env
+docker compose up --build -d
+```
+
+初回起動時は API コンテナ内で `prisma migrate deploy` が実行され、DB スキーマが自動適用されます。
+
+起動確認:
+
+```bash
+curl -i http://localhost:3000/healthz
+```
+
+停止:
+
+```bash
+docker compose down
+```
+
 ### スクリプト導線
 
 ```bash
