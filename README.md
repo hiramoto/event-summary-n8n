@@ -27,7 +27,7 @@ npm run dev
 
 ### Docker Compose での起動
 
-`docker-compose.yml` を同梱しているため、ローカルでも API + PostgreSQL をそのまま起動できます。
+`docker-compose.yml` を同梱しているため、ローカルでも API + PostgreSQL + n8n をそのまま起動できます。
 
 ```bash
 cp .env.example .env
@@ -35,12 +35,19 @@ docker compose up --build -d
 ```
 
 初回起動時は API コンテナ内で `prisma migrate deploy` が実行され、DB スキーマが自動適用されます。
+また、PostgreSQL 初回起動時に `db/init-n8ndb.sh` により `n8ndb` データベースが自動作成されます。
 
 起動確認:
 
 ```bash
+# API
 curl -i http://localhost:3000/healthz
+
+# n8n 管理画面（ローカル開発時）
+open http://localhost:5678
 ```
+
+> **本番環境**: n8n は外部に公開しません。SSH トンネル経由でアクセスしてください: `ssh -L 5678:localhost:5678 vps`
 
 停止:
 
