@@ -27,7 +27,7 @@ npm run dev
 
 ### Docker Compose での起動
 
-`docker-compose.yml` を同梱しているため、ローカルでも API + PostgreSQL をそのまま起動できます。
+`docker-compose.yml` を同梱しているため、ローカルでも API + PostgreSQL + n8n をそのまま起動できます。
 
 ```bash
 cp .env.example .env
@@ -35,12 +35,54 @@ docker compose up --build -d
 ```
 
 初回起動時は API コンテナ内で `prisma migrate deploy` が実行され、DB スキーマが自動適用されます。
+また PostgreSQL 初期化時に `n8ndb` が自動作成され、n8n が同じ PostgreSQL を利用します。
 
 起動確認:
 
 ```bash
 curl -i http://localhost:3000/healthz
+curl -I http://localhost:5678
 ```
+
+`5678` は `127.0.0.1` バインドなので、n8n UI へは同一ホストからのみアクセスできます。
+
+### Rocky Linux サーバーでの n8n 確認手順
+
+Rocky Linux 上では、以下の順で「起動」「UI疎通」「ログイン可否」を確認できます。
+
+1. コンテナ状態の確認
+
+```bash
+docker compose ps
+```
+
+期待値: `event-summary-n8n` が `Up`（または `healthy`）になっている。
+
+2. n8n のログ確認（起動失敗時の一次切り分け）
+
+```bash
+docker compose logs n8n --tail=100
+```
+
+期待値: `Editor is now accessible` 相当のログが出る。
+
+3. サーバー内から UI へ HTTP 到達確認
+
+```bash
+curl -I http://127.0.0.1:5678
+```
+
+期待値: `HTTP/1.1 200 OK`（またはログインページへの `302`）。
+
+4. 手元PCから SSH トンネルで UI を開く
+
+```bash
+ssh -L 5678:127.0.0.1:5678 <user>@<rocky-server>
+```
+
+その後、ローカルブラウザで `http://127.0.0.1:5678` を開いて UI 設定を行う。
+
+> 補足: `ports` を `127.0.0.1:5678:5678` にしているため、外部ネットワークから n8n UI へ直接アクセスできません（公開しない方針を維持）。
 
 停止:
 
