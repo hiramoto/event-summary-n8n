@@ -35,6 +35,23 @@ services:
     ports:
       - "3000:3000"
 
+  postgres-init:
+    image: postgres:16-alpine
+    container_name: event-summary-postgres-init
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: postgres
+    command: >
+      sh -c "
+      psql -h postgres -U postgres -d postgres -v ON_ERROR_STOP=1 \
+        -c \"CREATE DATABASE n8ndb;\" ||
+      psql -h postgres -U postgres -d postgres -v ON_ERROR_STOP=1 \
+        -c \"SELECT 'n8ndb already exists';\"
+      "
+
   n8n:
     image: n8nio/n8n:1.94.1
     container_name: event-summary-n8n
@@ -42,6 +59,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      postgres-init:
+        condition: service_completed_successfully
     environment:
       DB_TYPE: postgresdb
       DB_POSTGRESDB_HOST: postgres
