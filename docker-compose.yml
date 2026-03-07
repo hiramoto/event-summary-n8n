@@ -60,6 +60,8 @@ services:
         condition: service_healthy
       postgres-init:
         condition: service_completed_successfully
+    env_file:
+      - .env
     environment:
       DB_TYPE: postgresdb
       DB_POSTGRESDB_HOST: postgres
@@ -70,6 +72,7 @@ services:
       N8N_HOST: localhost
       N8N_PORT: 5678
       N8N_PROTOCOL: http
+      N8N_BLOCK_ENV_ACCESS: ${N8N_BLOCK_ENV_ACCESS:-false}
       TZ: Asia/Tokyo
     ports:
       - "127.0.0.1:5678:5678"

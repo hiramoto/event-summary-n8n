@@ -34,6 +34,8 @@ cp .env.example .env
 docker compose up --build -d
 ```
 
+`docker-compose.yml` では `api` / `n8n` の両サービスが `.env` を読み込みます。n8n ワークフロー内で `$env` を参照したい場合は、`.env` に値を追加してください（既定では `N8N_BLOCK_ENV_ACCESS=false`）。
+
 初回起動時は API コンテナ内で `prisma migrate deploy` が実行され、DB スキーマが自動適用されます。
 また PostgreSQL 初期化時に `n8ndb` が自動作成され、n8n が同じ PostgreSQL を利用します。
 
