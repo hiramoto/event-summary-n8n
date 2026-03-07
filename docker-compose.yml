@@ -44,13 +44,12 @@ services:
         condition: service_healthy
     environment:
       PGPASSWORD: postgres
-    command: >
-      sh -c "
-      psql -h postgres -U postgres -d postgres -v ON_ERROR_STOP=1 \
-        -c \"CREATE DATABASE n8ndb;\" ||
-      psql -h postgres -U postgres -d postgres -v ON_ERROR_STOP=1 \
-        -c \"SELECT 'n8ndb already exists';\"
-      "
+    command:
+      - sh
+      - -c
+      - |
+        psql -h postgres -U postgres -d postgres -c "CREATE DATABASE n8ndb;" ||
+        psql -h postgres -U postgres -d postgres -c "SELECT 'n8ndb already exists';"
 
   n8n:
     image: n8nio/n8n:1.94.1
