@@ -170,18 +170,18 @@ curl -i "https://<your-domain>/events?limit=5" \
 ┌──────────────────────────────────────────────────────┐
 │  Sakura VPS (Docker Compose)                         │
 │                                                      │
-│  ┌──────────┐    ┌──────────┐    ┌────────────────┐ │
-│  │  Caddy   │───▶│ Event API│───▶│   PostgreSQL   │ │
-│  │ (TLS:    │    │ (公開)   │    │ eventdb / n8ndb│ │
-│  │  Origin  │    └──────────┘    └───────┬────────┘ │
-│  │  Cert)   │                            │          │
-│  └──────────┘                    ┌───────┴────────┐ │
-│                                  │      n8n       │ │
-│       Caddy は Event API のみ    │ (内部のみ)     │ │
-│       n8n は外部に公開しない      │ 管理: SSH tunnel│ │
-│                                  └───────┬────────┘ │
-│                                          │          │
-└──────────────────────────────────────────┼──────────┘
+│  ┌──────────┐    ┌────────────────┐                  │
+│  │ Event API│───▶│   PostgreSQL   │                  │
+│  │ (公開)   │    │ eventdb / n8ndb│                  │
+│  └──────────┘    └───────┬────────┘                  │
+│                          │                           │
+│                  ┌───────┴────────┐                  │
+│                  │      n8n       │                  │
+│                  │ (内部のみ)     │                  │
+│  n8n は外部に公開しない │ 管理: SSH tunnel│                  │
+│                  └───────┬────────┘                  │
+│                          │                           │
+└──────────────────────────┼──────────────────────────┘
                                            │
                      n8n: cron(5分) → バッチ集計 → digest 生成
                                            │
@@ -200,11 +200,10 @@ curl -i "https://<your-domain>/events?limit=5" \
 
 ### TLS 方針
 
-**Cloudflare プロキシ ON（オレンジ雲）+ Origin Certificate + Full (Strict) + Authenticated Origin Pulls**
+**Cloudflare プロキシ ON（オレンジ雲）+ Full (Strict)**
 
 - Cloudflare が外向き TLS を終端し、CDN / WAF / Rate Limiting を提供
-- Caddy は Cloudflare Origin Certificate でオリジン側 TLS を提供（最長15年有効、Let's Encrypt 不要）
-- Authenticated Origin Pulls により Cloudflare 経由以外のアクセスを TLS レベルで拒否
+- オリジン側の TLS 構成は未実装（Cloudflare → オリジン間の HTTPS 化は今後対応）
 - さくら VPS のパケットフィルタで 80/443 を Cloudflare IP のみに制限
 
 ### n8n の公開方針
@@ -509,12 +508,6 @@ event-pipeline/
 ├── docker-compose.yml
 ├── .env                        # ← .gitignore 対象
 ├── .env.example
-├── caddy/
-│   ├── Caddyfile
-│   └── certs/                  # Origin Cert + Key + Origin Pull CA
-│       ├── origin.pem
-│       ├── origin-key.pem
-│       └── origin-pull-ca.pem
 ├── event-api/
 │   ├── Dockerfile
 │   ├── package.json
@@ -535,18 +528,6 @@ event-pipeline/
 
 ```yaml
 services:
-  caddy:
-    image: caddy:2-alpine
-    restart: unless-stopped
-    ports:
-      - "443:443"
-      - "80:80"
-    volumes:
-      - ./caddy/Caddyfile:/etc/caddy/Caddyfile
-      - ./caddy/certs:/etc/caddy/certs:ro
-      - caddy_data:/data
-      - caddy_config:/config
-
   event-api:
     build: ./event-api
     restart: unless-stopped
@@ -592,8 +573,6 @@ services:
       - "5432"
 
 volumes:
-  caddy_data:
-  caddy_config:
   n8n_data:
   pg_data:
 ```
@@ -631,32 +610,11 @@ EOSQL
 # テーブル作成は Prisma Migrate で行うため、ここでは DB 作成のみ
 ```
 
-## Caddyfile
-
-```caddyfile
-{
-    email you@example.com
-    auto_https off
-}
-
-{$API_SUBDOMAIN}.{$DOMAIN} {
-    tls /etc/caddy/certs/origin.pem /etc/caddy/certs/origin-key.pem {
-        client_auth {
-            mode require_and_verify
-            trusted_ca_cert_file /etc/caddy/certs/origin-pull-ca.pem
-        }
-    }
-    reverse_proxy event-api:3000
-}
-```
-
 ## Cloudflare 設定チェックリスト
 
 - [ ] サブドメイン `events.example.com` → さくら VPS IP（オレンジ雲 ON）
 - [ ] SSL/TLS → 暗号化モード: **Full (Strict)**
-- [ ] SSL/TLS → Origin Server → **Origin Certificate 作成**（RSA, 15年）→ `caddy/certs/` に配置
 - [ ] SSL/TLS → Origin Server → **Authenticated Origin Pulls: ON**
-- [ ] Origin Pull CA 証明書をダウンロード → `caddy/certs/origin-pull-ca.pem`
 - [ ] WAF → Rate Limiting: `/events` に対して 100 req/min/IP
 - [ ] WAF → Custom Rule: `POST` 以外のメソッドを `/events` でブロック
 - [ ] さくら VPS パケットフィルタ: 80/443 を [Cloudflare IP](https://www.cloudflare.com/ips/) のみ許可
@@ -744,8 +702,7 @@ n8n (内部) → HTTP Request → OpenClaw /hooks/agent (exe.dev)
 - [ ] Ubuntu セットアップ、Docker / Docker Compose インストール
 - [ ] パケットフィルタ設定（80/443 を Cloudflare IP のみ許可）
 - [ ] Cloudflare: サブドメイン設定、Origin Certificate 発行、Full (Strict)、Authenticated Origin Pulls ON
-- [ ] `caddy/certs/` に Origin Cert + Key + Origin Pull CA を配置
-- [ ] `docker compose up` で Caddy + PostgreSQL 起動、HTTPS 確認
+- [ ] `docker compose up` で PostgreSQL 起動確認
 - [ ] SSH トンネルで n8n 管理画面にアクセスできることを確認
 - 次アクション: VPS 上の初期セットアップ手順を `docs/runbook` に手順化する。
 
@@ -807,7 +764,6 @@ n8n (内部) → HTTP Request → OpenClaw /hooks/agent (exe.dev)
 - [OpenClaw Docs: Webhook](https://docs.openclaw.ai/automation/webhook)
 - [OpenClaw Docs: exe.dev](https://docs.openclaw.ai/install/exe-dev)
 - [n8n](https://n8n.io/) — ワークフロー自動化
-- [Caddy](https://caddyserver.com/) — リバースプロキシ
 - [Prisma](https://www.prisma.io/) — TypeScript ORM + Migration
 - [Tasker](https://tasker.joaoapps.com/) — Android 自動化
 - [AutoLocation](https://joaoapps.com/autolocation/) — Tasker ジオフェンスプラグイン
