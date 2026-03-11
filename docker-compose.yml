@@ -74,11 +74,29 @@ services:
       N8N_PROTOCOL: http
       N8N_BLOCK_ENV_ACCESS: ${N8N_BLOCK_ENV_ACCESS:-false}
       TZ: Asia/Tokyo
+      ZEROCLAW_GATEWAY_TOKEN: ${ZEROCLAW_GATEWAY_TOKEN}
     ports:
       - "127.0.0.1:5678:5678"
     volumes:
       - n8n_data:/home/node/.n8n
 
+  zeroclaw:
+    build:
+      context: ./zeroclaw
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    volumes:
+      - zeroclaw_data:/home/zeroclaw/.zeroclaw
+      - ./zeroclaw/identity.md:/etc/zeroclaw/IDENTITY.md:ro
+      - ./zeroclaw/workspace:/workspace
+    expose:
+      - "42617"
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    depends_on:
+      - postgres
+
 volumes:
   postgres_data:
   n8n_data:
+  zeroclaw_data:
