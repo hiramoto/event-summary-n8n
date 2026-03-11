@@ -1,4 +1,4 @@
-FROM rust:1.86 AS build
+FROM rust:1.87-bookworm AS build
 WORKDIR /build
 
 RUN apt-get update && apt-get install -y git pkg-config libssl-dev ca-certificates && rm -rf /var/lib/apt/lists/*
