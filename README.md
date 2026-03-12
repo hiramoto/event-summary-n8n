@@ -584,27 +584,25 @@ n8n が自動で作成・管理するので手動操作は不要。
 ## ディレクトリ構成
 
 ```
-event-pipeline/
+event-summary-n8n/
 ├── README.md
+├── Dockerfile                  # Event API 用
 ├── docker-compose.yml
+├── package.json
+├── tsconfig.json
 ├── .env                        # ← .gitignore 対象
 ├── .env.example
-├── event-api/
-│   ├── Dockerfile
-│   ├── package.json
-│   ├── tsconfig.json
-│   ├── prisma/
-│   │   └── schema.prisma
-│   └── src/
-│       └── index.ts            # Hono / Fastify
+├── prisma/
+│   └── schema.prisma
+├── src/
+│   └── server.ts               # Fastify Event API
+├── tests/                      # API テスト
 ├── db/
-│   └── init.sh                 # DB 作成のみ（テーブルは Prisma で管理）
+│   └── init/                   # DB 初期化スクリプト（DB 作成のみ）
 ├── zeroclaw/
-│   ├── Dockerfile
+│   ├── Dockerfile              # GitHub Releases からビルド済みバイナリを取得
 │   ├── identity.md
 │   └── workspace/
-├── scripts/
-│   └── digest-worker.ts        # n8n Code ノード用の集計ロジック
 └── n8n/
     └── workflows/              # エクスポートした n8n ワークフロー JSON
 ```
@@ -613,43 +611,89 @@ event-pipeline/
 
 ```yaml
 services:
-  event-api:
-    build: ./event-api
+  postgres:
+    image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/eventdb
-      - API_TOKEN=${API_TOKEN}
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: eventdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d eventdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
     depends_on:
-      - postgres
-    expose:
-      - "3000"
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/eventdb?schema=public
+      PORT: 3000
+    ports:
+      - "3000:3000"
+
+  postgres-init:
+    image: postgres:16-alpine
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: postgres
+    command:
+      - sh
+      - -c
+      - |
+        psql -h postgres -U postgres -d postgres -c "CREATE DATABASE n8ndb;" ||
+        psql -h postgres -U postgres -d postgres -c "SELECT 'n8ndb already exists';"
 
   n8n:
-    image: n8nio/n8n:latest
+    image: n8nio/n8n:1.94.1
     restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      postgres-init:
+        condition: service_completed_successfully
+    env_file:
+      - .env
     environment:
-      - DB_TYPE=postgresdb
-      - DB_POSTGRESDB_HOST=postgres
-      - DB_POSTGRESDB_PORT=5432
-      - DB_POSTGRESDB_DATABASE=n8ndb
-      - DB_POSTGRESDB_USER=${POSTGRES_USER}
-      - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD}
-      # WEBHOOK_URL は設定しない（外部から叩かない）
-      - GENERIC_TIMEZONE=Asia/Tokyo
-      - EVENTDB_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/eventdb
-      - ZEROCLAW_GATEWAY_TOKEN=${ZEROCLAW_GATEWAY_TOKEN}
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: postgres
+      DB_POSTGRESDB_PORT: 5432
+      DB_POSTGRESDB_DATABASE: n8ndb
+      DB_POSTGRESDB_USER: postgres
+      DB_POSTGRESDB_PASSWORD: postgres
+      N8N_HOST: localhost
+      N8N_PORT: 5678
+      N8N_PROTOCOL: http
+      N8N_BLOCK_ENV_ACCESS: ${N8N_BLOCK_ENV_ACCESS:-false}
+      TZ: Asia/Tokyo
+      ZEROCLAW_GATEWAY_TOKEN: ${ZEROCLAW_GATEWAY_TOKEN}
+    ports:
+      - "127.0.0.1:5678:5678"
     volumes:
       - n8n_data:/home/node/.n8n
-    depends_on:
-      - postgres
-    expose:
-      - "5678"
-    # ports は公開しない — SSH トンネルでアクセス
 
   zeroclaw:
     build:
       context: ./zeroclaw
       dockerfile: Dockerfile
+      args:
+        BUILDKIT_INLINE_CACHE: 1
     restart: unless-stopped
     volumes:
       - zeroclaw_data:/home/zeroclaw/.zeroclaw
@@ -662,56 +706,40 @@ services:
     depends_on:
       - postgres
 
-  postgres:
-    image: postgres:16-alpine
-    restart: unless-stopped
-    environment:
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-    volumes:
-      - pg_data:/var/lib/postgresql/data
-      - ./db/init.sh:/docker-entrypoint-initdb.d/init.sh
-    expose:
-      - "5432"
-
 volumes:
+  postgres_data:
   n8n_data:
   zeroclaw_data:
-  pg_data:
 ```
 
 ## .env.example
 
 ```bash
-# Domain
-DOMAIN=example.com
-API_SUBDOMAIN=events
+PORT=3000
+EVENT_API_TOKEN=replace-with-strong-random-token
+DATABASE_URL=postgresql://postgres:postgres@postgres:5432/eventdb?schema=public
 
-# PostgreSQL
-POSTGRES_USER=pipeline
-POSTGRES_PASSWORD=CHANGE_ME
+# n8n (docker-compose service) uses postgres://postgres:postgres@postgres:5432/n8ndb
+# UI is bound to 127.0.0.1:5678 and should be accessed through SSH tunnel on server environments.
 
-# Event API
-API_TOKEN=CHANGE_ME_LONG_RANDOM_STRING
+# Set to true to block $env access inside n8n expressions.
+N8N_BLOCK_ENV_ACCESS=false
 
 # ZeroClaw
 ANTHROPIC_API_KEY=sk-ant-xxxxx
-ZEROCLAW_GATEWAY_TOKEN=CHANGE_ME
+ZEROCLAW_GATEWAY_TOKEN=  # 初回ペアリング後に設定
 ```
 
-## db/init.sh
+## db/init/00-create-n8n-db.sql
 
-```bash
-#!/bin/bash
-set -e
-
-psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" <<-EOSQL
-    CREATE DATABASE eventdb;
-    CREATE DATABASE n8ndb;
-EOSQL
-
-# テーブル作成は Prisma Migrate で行うため、ここでは DB 作成のみ
+```sql
+SELECT 'CREATE DATABASE n8ndb'
+WHERE NOT EXISTS (
+  SELECT FROM pg_database WHERE datname = 'n8ndb'
+)\gexec
 ```
+
+> `eventdb` は `docker-compose.yml` の `POSTGRES_DB` で自動作成される。`n8ndb` のみ初期化スクリプトで作成。
 
 ## Cloudflare 設定チェックリスト
 
@@ -876,7 +904,7 @@ Content-Type: application/json
 
 ## 参考リンク
 
-- [ZeroClaw](https://github.com/zeroclaw-labs/zeroclaw) — 軽量 Rust 製 AI エージェントランタイム
+- [ZeroClaw](https://github.com/zeroclaw-labs/zeroclaw) — 軽量 Rust 製 AI エージェントランタイム（GitHub Releases のビルド済みバイナリを使用）
 - [n8n](https://n8n.io/) — ワークフロー自動化
 - [Prisma](https://www.prisma.io/) — TypeScript ORM + Migration
 - [Tasker](https://tasker.joaoapps.com/) — Android 自動化
