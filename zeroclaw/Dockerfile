@@ -14,6 +14,8 @@ RUN apt-get update && apt-get install -y ca-certificates curl gosu && rm -rf /va
 
 RUN useradd -m zeroclaw \
     && mkdir -p /workspace \
+    && mkdir -p /home/zeroclaw/.zeroclaw \
+    && chown -R zeroclaw:zeroclaw /home/zeroclaw \
     && chown zeroclaw:zeroclaw /workspace
 
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
