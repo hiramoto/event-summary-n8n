@@ -90,7 +90,7 @@ services:
     volumes:
       - zeroclaw_data:/home/zeroclaw/.zeroclaw
       - ./zeroclaw/identity.md:/etc/zeroclaw/IDENTITY.md:ro
-      - ./zeroclaw/workspace:/workspace
+      - zeroclaw_workspace:/workspace
     expose:
       - "42617"
     environment:
@@ -102,3 +102,4 @@ volumes:
   postgres_data:
   n8n_data:
   zeroclaw_data:
+  zeroclaw_workspace:
