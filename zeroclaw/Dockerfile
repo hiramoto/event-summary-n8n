@@ -1,5 +1,5 @@
 # ---- ビルド済みバイナリを GitHub Releases から取得 ----
-FROM debian:bookworm-slim
+FROM debian:trixie-slim
 
 ARG ZEROCLAW_VERSION=v0.1.7
 ARG TARGETARCH=amd64
