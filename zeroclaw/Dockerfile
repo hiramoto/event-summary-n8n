@@ -16,4 +16,4 @@ RUN useradd -m zeroclaw
 USER zeroclaw
 WORKDIR /home/zeroclaw
 EXPOSE 42617
-CMD ["zeroclaw", "gateway", "--port", "42617", "--bind", "0.0.0.0"]
+CMD ["zeroclaw", "gateway", "--port", "42617"]
