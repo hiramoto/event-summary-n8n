@@ -12,7 +12,9 @@ RUN apt-get update && apt-get install -y ca-certificates curl && rm -rf /var/lib
     && rm /tmp/zeroclaw.tar.gz \
     && chmod +x /usr/local/bin/zeroclaw
 
-RUN useradd -m zeroclaw
+RUN useradd -m zeroclaw \
+    && mkdir -p /workspace \
+    && chown zeroclaw:zeroclaw /workspace
 USER zeroclaw
 WORKDIR /home/zeroclaw
 EXPOSE 42617
