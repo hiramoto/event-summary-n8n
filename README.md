@@ -243,6 +243,99 @@ curl -i "https://<your-domain>/events?limit=5" \
 > コンテナ起動時に `prisma migrate deploy` を自動実行してから API を起動します。
 > そのため、`DATABASE_URL` は起動時点で接続可能な DB を指定してください。
 
+### デプロイ後の動作確認チェックリスト（コピペ用）
+
+デプロイ完了後、以下を順番に実施すると「起動」「認証」「DB 書き込み」「一覧取得」まで確認できます。
+
+```bash
+export BASE_URL="https://<your-service-domain>"
+export EVENT_API_TOKEN="<your-token>"
+export EVENT_ID="$(python - <<'PY'
+import uuid
+print(uuid.uuid4())
+PY
+)"
+```
+
+1. ヘルスチェック（認証不要）
+
+```bash
+curl -i "$BASE_URL/healthz"
+```
+
+期待結果:
+- `HTTP/1.1 200 OK`
+- レスポンス本文: `{"ok":true}`
+
+2. 認証なしアクセスが拒否されることを確認（`/healthz` 以外）
+
+```bash
+curl -i "$BASE_URL/events"
+```
+
+期待結果:
+- `HTTP/1.1 401 Unauthorized`
+
+3. イベント投入（認証あり）
+
+```bash
+curl -i -X POST "$BASE_URL/events" \
+  -H "Authorization: Bearer $EVENT_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"event_id\": \"$EVENT_ID\",
+    \"type\": \"location\",
+    \"ts\": \"2025-02-23T10:30:00+09:00\",
+    \"payload\": {
+      \"event\": \"enter\",
+      \"place_id\": \"office\"
+    },
+    \"device_id\": \"deploy-check\"
+  }"
+```
+
+期待結果:
+- `HTTP/1.1 200 OK`
+- レスポンス本文の例: `{"ok":true,"duplicate":false}`
+
+4. 同じ `event_id` を再送して冪等性確認
+
+```bash
+curl -i -X POST "$BASE_URL/events" \
+  -H "Authorization: Bearer $EVENT_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"event_id\": \"$EVENT_ID\",
+    \"type\": \"location\",
+    \"ts\": \"2025-02-23T10:30:00+09:00\",
+    \"payload\": {
+      \"event\": \"enter\",
+      \"place_id\": \"office\"
+    }
+  }"
+```
+
+期待結果:
+- `HTTP/1.1 200 OK`
+- レスポンス本文の例: `{"ok":true,"duplicate":true}`
+
+5. 一覧取得（認証あり）
+
+```bash
+curl -i "$BASE_URL/events?limit=5" \
+  -H "Authorization: Bearer $EVENT_API_TOKEN"
+```
+
+期待結果:
+- `HTTP/1.1 200 OK`
+- `items` 配列内に、手順 3 で投入した `event_id` が含まれる
+
+6. 異常時のログ確認（任意）
+
+- `prisma migrate deploy` 失敗時: コンテナ起動ログに DB 接続エラーが出る
+- API 5xx 発生時: アプリログに Fastify のエラー出力が残る
+- まず `DATABASE_URL` の接続先（ホスト/ポート/認証情報）と `EVENT_API_TOKEN` の設定値を再確認
+
 ## 全体構成
 
 ```
