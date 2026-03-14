@@ -96,6 +96,7 @@ services:
       - "42617"
     environment:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
     depends_on:
       - postgres
 
