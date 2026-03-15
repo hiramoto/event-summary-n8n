@@ -92,7 +92,7 @@ services:
     restart: unless-stopped
     volumes:
       - zeroclaw_data:/home/zeroclaw/.zeroclaw
-      - ./zeroclaw/config.toml:/home/zeroclaw/.zeroclaw/config.toml:ro
+      - ./zeroclaw/config.toml:/home/zeroclaw/.zeroclaw/config.toml
       - ./zeroclaw/identity.md:/etc/zeroclaw/IDENTITY.md:ro
       - zeroclaw_workspace:/workspace
     expose:
