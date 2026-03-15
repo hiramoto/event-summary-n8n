@@ -86,7 +86,8 @@ services:
       dockerfile: Dockerfile
       args:
         BUILDKIT_INLINE_CACHE: 1
-    command: ["zeroclaw", "channel", "start"]
+    #command: ["zeroclaw", "channel", "start"]
+    command: ["zeroclaw", "daemon", "--port", "42617"]
     restart: unless-stopped
     volumes:
       - zeroclaw_data:/home/zeroclaw/.zeroclaw
