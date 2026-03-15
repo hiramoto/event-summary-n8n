@@ -60,6 +60,8 @@ services:
         condition: service_healthy
       postgres-init:
         condition: service_completed_successfully
+      zeroclaw:
+        condition: service_started
     env_file:
       - .env
     environment:
@@ -86,19 +88,18 @@ services:
       dockerfile: Dockerfile
       args:
         BUILDKIT_INLINE_CACHE: 1
-    #command: ["zeroclaw", "channel", "start"]
     command: ["zeroclaw", "daemon", "--port", "42617"]
     restart: unless-stopped
     volumes:
       - zeroclaw_data:/home/zeroclaw/.zeroclaw
+      - ./zeroclaw/config.toml:/home/zeroclaw/.zeroclaw/config.toml:ro
       - ./zeroclaw/identity.md:/etc/zeroclaw/IDENTITY.md:ro
       - zeroclaw_workspace:/workspace
     expose:
       - "42617"
     environment:
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
-      - TZ=Asia/Tokyo
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
     depends_on:
       - postgres
 
