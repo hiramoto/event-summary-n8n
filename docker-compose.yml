@@ -98,6 +98,7 @@ services:
     environment:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - TZ=Asia/Tokyo
     depends_on:
       - postgres
 
